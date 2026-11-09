@@ -32,6 +32,7 @@ td small{display:block;font-weight:400;color:var(--mu);font-size:11px}
 <label>File Excel campaign<input type="file" id="f" accept=".xlsx,.xls,.csv"></label>
 <label>Sheet<select id="sh"></select></label>
 <label>Toleransi (Rp)<input id="tol" type="number" value="0" style="width:90px"></label>
+<label>Aturan diskon<select id="rule"><option value="auto">Otomatis (TikTok/Tokopedia = 0%)</option><option value="nodisc">Tanpa diskon (campaign = harga jual)</option><option value="disc">Boleh diskon (campaign ≤ harga jual)</option></select></label>
 <label>Kategori jika tidak terdeteksi<select id="dc"><option value="">(otomatis dari SKU/nama)</option></select></label>
 </div>
 <div class="row" style="margin-top:10px" id="map">
@@ -89,7 +90,7 @@ function drawRef(){const q=$('rq').value.toLowerCase().trim(),c=$('rc').value;
 $('rc').onchange=drawRef;$('rq').oninput=drawRef;drawRef();
 // ---------- matching
 const nk=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-const SKUI={},dup=new Set();REF.forEach((r,i)=>{if(!r.sku)return;const k=nk(r.sku);if(k in SKUI)dup.add(k);else SKUI[k]=i});dup.forEach(k=>delete SKUI[k]);
+const SKUI={},dup=new Set(),SKUD={};REF.forEach((r,i)=>{if(!r.sku)return;const k=nk(r.sku);if(k in SKUI)dup.add(k);else SKUI[k]=i});dup.forEach(k=>{SKUD[k]=REF.map((r,i)=>i).filter(i=>nk(REF[i].sku)==k);delete SKUI[k]});
 const SKUK=Object.keys(SKUI);
 const STOP=new Set('semua keiko cover mobil selimut body silver deluxe ultimate armor plastik abu warna premium series skrg di bwh bawah dibwh dengan untuk tipe type hitam full list merah biru emas coklat ready pre order po mh hm hb toyota honda daihatsu suzuki mitsubishi nissan hyundai wuling kia mazda ford datsun isuzu chevrolet lama new all an a n b c d lb la tahun thn s m l xl xxl size ukuran'.split(' '));
 const yrs=s=>(String(s).match(/\b(19|20)\d\d\b/g)||[]).map(Number);
@@ -113,40 +114,43 @@ function best(cat,text){const Q=new Set(tok(text)),qy=yrs(text),qn=isNew(text),q
  return B}
 function match(sku,name,prod=''){const k=nk(sku);let r,how;
  if(k&&SKUI[k]!=null){r=REF[SKUI[k]];how='SKU'}
+ else if(k&&SKUD[k]){const L=SKUD[k].map(i=>REF[i]),mk=$('mp').value==='tk'?'tt':$('mp').value,v=L.map(x=>x.p[mk]&&x.p[mk][0]);if(v.every(a=>a&&a==v[0])){r=L[0];how='SKU dipakai '+L.length+' tipe (harga sama)'}}
  else if(k){const p=SKUK.filter(x=>x.length>=7&&k.startsWith(x)).sort((a,b)=>b.length-a.length)[0];if(p){r=REF[SKUI[p]];how='SKU (awalan)'}}
+ if(!r&&k){for(const[a,b]of[['MBLKC','MBLKD'],['MBLKN','MBLKD'],['MBLKB','MBLKU'],['MBLKAB','MBLKAU'],['MTRKAB','MTRKAU']])if(k.startsWith(a)&&SKUI[b+k.slice(a.length)]!=null){r=REF[SKUI[b+k.slice(a.length)]];how='SKU varian '+a+' = tier '+b;break}}
  if(r)return{r,how};
+ if(k&&String(name||prod).length>45)return null;
  if((/\bmotor\b/i.test(prod)&&!/\bmobil\b/i.test(prod))||k.startsWith('MTRK')){const m=motorMatch(name,prod);if(m)return m}
  const cat=catOf2(sku,name,prod);if(!cat)return null;
  let t=String(name||prod);r=best(cat,t);if(r)return{r,how:'Nama'};
  const low=t.toLowerCase();for(const[a,b]of aliases()){if(low.includes(a)){r=best(cat,low.replace(a,' '+b+' '));if(r)return{r,how:'Alias: '+a}}}
  return null}
 // ---------- upload & hitung
-let HH=[],WB=null,ROWS=[],HI=0,FILT='all',OUT=[];
+let FB=-1,HH=[],WB=null,ROWS=[],HI=0,FILT='all',OUT=[];
 const num=v=>{if(typeof v=='number')return v;let s=String(v??'').replace(/Rp|\s/gi,'');if(!/\d/.test(s))return null;s=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s.replace(/\./g,'');const x=parseFloat(s);return isNaN(x)?null:x};
 $('f').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>{WB=XLSX.read(ev.target.result,{type:'array'});$('sh').innerHTML=WB.SheetNames.map(n=>`<option>${esc(n)}</option>`).join('');load()};rd.readAsArrayBuffer(f)};
 $('sh').onchange=load;
 function opts(H,re){const o='<option value="-1">(tidak ada)</option>'+H.map((h,i)=>`<option value="${i}">${esc(h||'Kolom '+(i+1))}</option>`).join('');return o}
 function load(){const ws=WB.Sheets[$('sh').value];let rg=XLSX.utils.decode_range(ws['!ref']||'A1');for(const k in ws){if(k[0]=='!')continue;const c=XLSX.utils.decode_cell(k);if(c.r>rg.e.r)rg.e.r=c.r;if(c.c>rg.e.c)rg.e.c=c.c}ws['!ref']=XLSX.utils.encode_range(rg);ROWS=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
  HI=ROWS.findIndex((r,i)=>i<20&&r.filter(c=>typeof c=='string'&&c.trim()).length>=3);if(HI<0)HI=0;
- const H=ROWS[HI].map(x=>String(x).trim());HH=H;const first=(...res)=>{for(const re of res){const i=H.findIndex(h=>re.test(h));if(i>=0)return i}return -1};const find=(re,not)=>H.findIndex(h=>re.test(h)&&!(not&&not.test(h)));
+ const H=ROWS[HI].map(x=>String(x).trim());HH=H;FB=H.findIndex(h=>/current campaign price/i.test(h));const first=(...res)=>{for(const re of res){const i=H.findIndex(h=>re.test(h));if(i>=0)return i}return -1};const find=(re,not)=>H.findIndex(h=>re.test(h)&&!(not&&not.test(h)));
  const set=(id,i)=>{$(id).innerHTML=opts(H);$(id).value=String(i)};
- const orig=first(/saat ini|current|normal/i,/awal|asli|original|coret|sebelum|harga produk|harga jual/i);
- set('cs',find(/sku/i));set('cn',first(/nama variasi|variation name|variasi/i,/nama produk|product name|nama/i));
- set('cp',first(/harga diskon|campaign|promo|flash|deal|pengajuan|setelah/i,/diskon/i,/harga/i));set('co',orig);
- ['cs','cn','cp','co','mp','tol','dc'].forEach(i=>$(i).onchange=calc);$('al').oninput=calc;calc()}
-function calc(){if(!ROWS.length)return;const cs=+$('cs').value,cn=+$('cn').value,cp=+$('cp').value,co=+$('co').value,mp=$('mp').value==='tk'?'tt':$('mp').value,tol=+$('tol').value||0;OUT=[];
+ const orig=first(/harga saat ini|current price|normal/i,/awal|asli|original|coret|sebelum|harga produk|harga jual/i);
+ if(H.some(h=>/campaign price range|retail price/i.test(h)))$('mp').value='tt';else if(H.some(h=>/harga diskon/i.test(h)))$('mp').value='sp';set('cs',first(/sku name|seller sku|kode sku|^sku$/i,/sku/i));set('cn',first(/nama variasi|variation name|variasi/i,/nama produk|product name|nama/i));
+ set('cp',first(/harga diskon|new campaign price/i,/current campaign price/i,/campaign(?!.*range)|promo|flash|deal|pengajuan|setelah/i,/diskon/i,/harga/i));set('co',orig);
+ ['cs','cn','cp','co','mp','tol','dc','rule'].forEach(i=>$(i).onchange=calc);$('al').oninput=calc;calc()}
+function calc(){if(!ROWS.length)return;const cs=+$('cs').value,cn=+$('cn').value,cp=+$('cp').value,co=+$('co').value,mp=$('mp').value==='tk'?'tt':$('mp').value,tol=+$('tol').value||0,nodisc=$('rule').value==='nodisc'||($('rule').value==='auto'&&mp==='tt');OUT=[];
  const pn=HH.findIndex((h,i)=>/nama produk|product name/i.test(h)&&i!=cn);
- for(const r of ROWS.slice(HI+1)){const sku=cs>=0?r[cs]:'',nm=cn>=0?r[cn]:'',pr=pn>=0?r[pn]:'',cpv=num(r[cp]);if(cpv==null||cpv<1000||!(String(sku).trim()||String(nm).trim()))continue;
+ for(const r of ROWS.slice(HI+1)){const sku=cs>=0?r[cs]:'',nm=cn>=0?r[cn]:'',pr=pn>=0?r[pn]:'',cpv=(num(r[cp])??(FB>=0?num(r[FB]):null));if(cpv==null||cpv<1000||!(String(sku).trim()||String(nm).trim()))continue;
   const m=match(sku,nm,pr),o=co>=0?num(r[co]):null,x={sku,nm:nm||pr,pr,cp:cpv,o,m};
   if(!m||!m.r.p[mp]){x.st='nf'}else{const ref=m.r.p[mp][0];x.ref=ref;x.d=ref-cpv;x.pct=(ref-cpv)/ref*100;
-   const oOk=o==null||Math.abs(o-ref)<=tol,cOk=cpv<=ref+tol;x.oOk=oOk;x.cOk=cOk;x.st=oOk&&cOk?'ok':'no'}
+   const oOk=o==null||Math.abs(o-ref)<=tol,cOk=nodisc?Math.abs(cpv-ref)<=tol:cpv<=ref+tol;x.oOk=oOk;x.cOk=cOk;x.st=oOk&&cOk?'ok':'no'}
   OUT.push(x)}draw()}
 function draw(){const cnt={all:OUT.length,ok:0,no:0,nf:0};OUT.forEach(x=>cnt[x.st]++);const mp=$('mp').value==='tk'?'tt':$('mp').value,co=+$('co').value>=0;
  const L=OUT.filter(x=>FILT=='all'||x.st==FILT);const lab={all:'Semua',ok:'Sesuai',no:'Tidak sesuai',nf:'Tidak ditemukan'};
  const old=l=>/\b(2025|Mar 26|Mei 26)\b/.test(l)||/ 25$/.test(l);
  $('res').innerHTML=`<div class="chips">${Object.keys(lab).map(k=>`<button class="chip ${FILT==k?'on':''}" data-k="${k}">${lab[k]}: <b>${cnt[k]}</b></button>`).join('')}</div>
  <div class="sc"><table><tr><th>#</th><th>SKU</th><th>Nama (file campaign)</th><th>Cocok dengan rujukan</th><th class="n">Harga rujukan (${MPN[$('mp').value]})</th>${co?'<th class="n">Harga normal</th>':''}<th class="n">Harga campaign</th><th class="n">Selisih</th><th class="n">Diskon</th><th>Status</th></tr>`+
- L.map((x,i)=>{const p=x.m&&x.m.r.p[mp];const msg=x.st=='nf'?'<span class="bd nf">Tidak ditemukan</span>':x.st=='ok'?'<span class="bd ok">Sesuai</span>':`<span class="bd no">${!x.cOk?'Campaign di atas harga jual':'Harga normal ≠ rujukan'}</span>`;
+ L.map((x,i)=>{const p=x.m&&x.m.r.p[mp];const msg=x.st=='nf'?'<span class="bd nf">Tidak ditemukan</span>':x.st=='ok'?'<span class="bd ok">Sesuai</span>':`<span class="bd no">${!x.cOk?(x.cp>x.ref?'Campaign di atas harga jual':'Ada diskon (seharusnya 0%)'):'Harga normal ≠ rujukan'}</span>`;
   return`<tr><td>${i+1}</td><td>${esc(x.sku)}</td><td style="white-space:normal;min-width:220px">${esc(x.nm)}</td><td>${x.m?esc(x.m.r.name)+`<small>${x.m.r.cat} · ${esc(x.m.how)}</small>`:'–'}</td>
   <td class="n ${mp}">${p?rp(p[0])+`<small>${p[1]}${old(p[1])?' ⚠ rujukan lama':''}</small>`:'–'}</td>${co?`<td class="n" style="${x.o!=null&&x.oOk===false?'color:var(--r);font-weight:600':''}">${rp(x.o)}</td>`:''}
   <td class="n">${rp(x.cp)}</td><td class="n">${x.d==null?'–':rp(x.d)}</td><td class="n">${x.pct==null?'–':(x.pct<0?'':'')+x.pct.toFixed(1).replace('.',',')+'%'}</td><td>${msg}</td></tr>`}).join('')+'</table></div>';
