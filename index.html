@@ -69,7 +69,13 @@ jimny = rush terios
 terios = rush terios
 rush = rush terios
 sigra = calya sigra
-karimun wagon = karimun`;
+karimun wagon = karimun
+cherry tigo = serena
+starlet = starlet glanza
+civic turbo = civic sedan
+innova lama = grand innova
+g. livina = grand livina
+c. twincam = corolla twincam`;
 $('dc').insertAdjacentHTML('beforeend',CATS.filter(c=>/Mobil|Plastik/.test(c)).map(c=>`<option>${c}</option>`).join(''));
 function tab(n){$('p1').classList.toggle('hide',n!=1);$('p2').classList.toggle('hide',n!=2);$('t1').className=n==1?'on':'';$('t2').className=n==2?'on':''}
 $('t1').onclick=()=>tab(1);$('t2').onclick=()=>tab(2);
@@ -85,12 +91,17 @@ $('rc').onchange=drawRef;$('rq').oninput=drawRef;drawRef();
 const nk=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const SKUI={},dup=new Set();REF.forEach((r,i)=>{if(!r.sku)return;const k=nk(r.sku);if(k in SKUI)dup.add(k);else SKUI[k]=i});dup.forEach(k=>delete SKUI[k]);
 const SKUK=Object.keys(SKUI);
-const STOP=new Set('semua keiko cover mobil selimut body silver deluxe ultimate armor plastik abu warna premium series skrg di bwh bawah dibwh dengan untuk tipe type hitam full list merah biru emas coklat ready pre order po mh hm hb toyota honda daihatsu suzuki mitsubishi nissan hyundai wuling kia mazda ford datsun isuzu chevrolet lama new all an a n tahun thn s m l xl xxl size ukuran'.split(' '));
+const STOP=new Set('semua keiko cover mobil selimut body silver deluxe ultimate armor plastik abu warna premium series skrg di bwh bawah dibwh dengan untuk tipe type hitam full list merah biru emas coklat ready pre order po mh hm hb toyota honda daihatsu suzuki mitsubishi nissan hyundai wuling kia mazda ford datsun isuzu chevrolet lama new all an a n b c d lb la tahun thn s m l xl xxl size ukuran'.split(' '));
 const yrs=s=>(String(s).match(/\b(19|20)\d\d\b/g)||[]).map(Number);
-const tok=s=>String(s).toLowerCase().replace(/armor\s*5/g,' ').replace(/[^a-z0-9]+/g,' ').split(' ').filter(t=>t&&!STOP.has(t)&&!/^(19|20)\d\d$/.test(t));
+const tok=s=>String(s).toLowerCase().replace(/armor\s*5/g,' ').replace(/\bsdn\b/g,'sedan').replace(/\bhtb\b/g,'hatchback').replace(/[^a-z0-9]+/g,' ').split(' ').filter(t=>t&&!STOP.has(t)&&!/^(19|20)\d\d$/.test(t));
 const isNew=s=>/\b(a\.?n|all new|new)\b/i.test(s),isOld=s=>/lama|di ?bawah|dibwh|di bwh/i.test(s);
 function catOf(sku,name){const k=nk(sku),m=[['MBLKS','Mobil Silver'],['MBLKD','Mobil Deluxe'],['MBLKU','Mobil Ultimate'],['MBLKA','Mobil Armor 5'],['MBLKW','Mobil Warna'],['MTRK','Motor'],['KM7D','Karpet 7D']].find(x=>k.startsWith(x[0]));if(m)return m[1];
  const n=String(name).toLowerCase();if(/armor/.test(n))return'Mobil Armor 5';if(/ultimate/.test(n))return'Mobil Ultimate';if(/deluxe/.test(n))return'Mobil Deluxe';if(/abu/.test(n)&&/plastik/.test(n))return'Plastik Abu';if(/plastik/.test(n))return'Mobil Plastik';if(/warna|list|full hitam/.test(n))return'Mobil Warna';if(/silver/.test(n))return'Mobil Silver';if(/7d/.test(n))return'Karpet 7D';return $('dc').value||null}
+function catOf2(sku,n,p){const a=String(n).toLowerCase(),b=String(p).toLowerCase();
+ if(/ecolite|\beco\b/.test(a))return'Plastik Abu';if(/crystal|transparan|bening/.test(a))return'Mobil Plastik';if(/\bbold\b|list|full hitam/.test(a+' '+b.slice(0,70)))return'Mobil Warna';return catOf(sku,n+' '+p)}
+function motorMatch(n,p){const a=String(n).toLowerCase(),b=String(p).toLowerCase(),f=s=>/armor/.test(s)?'Motor Armor 5':/ultimate|phantom/.test(s)?'Motor Ultimate':/carbon/.test(s)?'Motor Deluxe Carbon':/navy/.test(s)?'Motor Deluxe Navy':/platinum|deluxe/.test(s)?'Motor Deluxe':null,tier=f(a)||(/armor/.test(b)&&/ultimate/.test(b)?null:f(b));if(!tier)return null;
+ const z=/\b(XXL|XL|L|M)\b/i;let sz=(String(n).match(z)||String(p).match(z)||[])[1];if(!sz)sz=/xmax/.test(a+b)?'XL':'L';sz=sz.toUpperCase();
+ const r=REF.find(x=>x.cat=='Motor'&&x.name.toLowerCase()==(tier+' '+sz).toLowerCase());return r?{r,how:'Motor: '+tier+' '+sz}:null}
 function aliases(){return $('al').value.split('\n').map(l=>l.split('=')).filter(a=>a.length==2).map(a=>[a[0].trim().toLowerCase(),a[1].trim().toLowerCase()]).sort((x,y)=>y[0].length-x[0].length)}
 function best(cat,text){const Q=new Set(tok(text)),qy=yrs(text),qn=isNew(text),qo=isOld(text);let B=null,bs=-1e9;
  for(const r of REF){if(r.cat!=cat)continue;const alts=r.name.replace(/\(.*?\)/g,' ').split('/').map(tok).filter(a=>a.length);let top=-1;
@@ -100,31 +111,33 @@ function best(cat,text){const Q=new Set(tok(text)),qy=yrs(text),qn=isNew(text),q
   const cn=isNew(r.name),co=isOld(r.name);s+=(cn==qn?3:-3)+(co==qo?2:-2);s-=Math.max(0,Q.size-alts.reduce((m,a)=>Math.max(m,a.length),0))*0.1;
   if(s>bs){bs=s;B=r}}
  return B}
-function match(sku,name){const k=nk(sku);let r,how;
+function match(sku,name,prod=''){const k=nk(sku);let r,how;
  if(k&&SKUI[k]!=null){r=REF[SKUI[k]];how='SKU'}
  else if(k){const p=SKUK.filter(x=>x.length>=7&&k.startsWith(x)).sort((a,b)=>b.length-a.length)[0];if(p){r=REF[SKUI[p]];how='SKU (awalan)'}}
  if(r)return{r,how};
- const cat=catOf(sku,name);if(!cat)return null;
- let t=String(name);r=best(cat,t);if(r)return{r,how:'Nama'};
+ if((/\bmotor\b/i.test(prod)&&!/\bmobil\b/i.test(prod))||k.startsWith('MTRK')){const m=motorMatch(name,prod);if(m)return m}
+ const cat=catOf2(sku,name,prod);if(!cat)return null;
+ let t=String(name||prod);r=best(cat,t);if(r)return{r,how:'Nama'};
  const low=t.toLowerCase();for(const[a,b]of aliases()){if(low.includes(a)){r=best(cat,low.replace(a,' '+b+' '));if(r)return{r,how:'Alias: '+a}}}
  return null}
 // ---------- upload & hitung
-let WB=null,ROWS=[],HI=0,FILT='all',OUT=[];
+let HH=[],WB=null,ROWS=[],HI=0,FILT='all',OUT=[];
 const num=v=>{if(typeof v=='number')return v;let s=String(v??'').replace(/Rp|\s/gi,'');if(!/\d/.test(s))return null;s=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s.replace(/\./g,'');const x=parseFloat(s);return isNaN(x)?null:x};
 $('f').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>{WB=XLSX.read(ev.target.result,{type:'array'});$('sh').innerHTML=WB.SheetNames.map(n=>`<option>${esc(n)}</option>`).join('');load()};rd.readAsArrayBuffer(f)};
 $('sh').onchange=load;
 function opts(H,re){const o='<option value="-1">(tidak ada)</option>'+H.map((h,i)=>`<option value="${i}">${esc(h||'Kolom '+(i+1))}</option>`).join('');return o}
 function load(){ROWS=XLSX.utils.sheet_to_json(WB.Sheets[$('sh').value],{header:1,defval:'',raw:true});
  HI=ROWS.findIndex((r,i)=>i<20&&r.filter(c=>typeof c=='string'&&c.trim()).length>=3);if(HI<0)HI=0;
- const H=ROWS[HI].map(x=>String(x).trim());const find=(re,not)=>H.findIndex(h=>re.test(h)&&!(not&&not.test(h)));
+ const H=ROWS[HI].map(x=>String(x).trim());HH=H;const first=(...res)=>{for(const re of res){const i=H.findIndex(h=>re.test(h));if(i>=0)return i}return -1};const find=(re,not)=>H.findIndex(h=>re.test(h)&&!(not&&not.test(h)));
  const set=(id,i)=>{$(id).innerHTML=opts(H);$(id).value=String(i)};
- const orig=find(/normal|awal|asli|original|coret|harga produk|harga saat ini|current|sebelum|harga jual/i);
- set('cs',find(/sku/i));set('cn',find(/nama (produk|variasi)|product name|variation name|nama|variasi/i));
- set('cp',find(/campaign|promo|flash|deal|diskon|setelah|pengajuan|harga/i,/normal|awal|asli|original|coret|sebelum/i));set('co',orig);
+ const orig=first(/saat ini|current|normal/i,/awal|asli|original|coret|sebelum|harga produk|harga jual/i);
+ set('cs',find(/sku/i));set('cn',first(/nama variasi|variation name|variasi/i,/nama produk|product name|nama/i));
+ set('cp',first(/harga diskon|campaign|promo|flash|deal|pengajuan|setelah/i,/diskon/i,/harga/i));set('co',orig);
  ['cs','cn','cp','co','mp','tol','dc'].forEach(i=>$(i).onchange=calc);$('al').oninput=calc;calc()}
 function calc(){if(!ROWS.length)return;const cs=+$('cs').value,cn=+$('cn').value,cp=+$('cp').value,co=+$('co').value,mp=$('mp').value==='tk'?'tt':$('mp').value,tol=+$('tol').value||0;OUT=[];
- for(const r of ROWS.slice(HI+1)){const sku=cs>=0?r[cs]:'',nm=cn>=0?r[cn]:'',cpv=num(r[cp]);if(cpv==null||!(String(sku).trim()||String(nm).trim()))continue;
-  const m=match(sku,nm),o=co>=0?num(r[co]):null,x={sku,nm,cp:cpv,o,m};
+ const pn=HH.findIndex((h,i)=>/nama produk|product name/i.test(h)&&i!=cn);
+ for(const r of ROWS.slice(HI+1)){const sku=cs>=0?r[cs]:'',nm=cn>=0?r[cn]:'',pr=pn>=0?r[pn]:'',cpv=num(r[cp]);if(cpv==null||cpv<1000||!(String(sku).trim()||String(nm).trim()))continue;
+  const m=match(sku,nm,pr),o=co>=0?num(r[co]):null,x={sku,nm:nm||pr,pr,cp:cpv,o,m};
   if(!m||!m.r.p[mp]){x.st='nf'}else{const ref=m.r.p[mp][0];x.ref=ref;x.d=ref-cpv;x.pct=(ref-cpv)/ref*100;
    const oOk=o==null||Math.abs(o-ref)<=tol,cOk=cpv<=ref+tol;x.oOk=oOk;x.cOk=cOk;x.st=oOk&&cOk?'ok':'no'}
   OUT.push(x)}draw()}
